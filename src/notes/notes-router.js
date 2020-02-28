@@ -83,7 +83,7 @@ notesRouter
   })
   .patch(jsonParser, (req, res, next) => {
     const { content, modified } = req.body
-    const commentToUpdate = { content, modified }
+    const noteToUpdate = { content, modified }
 
     const numberOfValues = Object.values(noteToUpdate).filter(Boolean).length
     if (numberOfValues === 0)
