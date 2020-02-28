@@ -39,7 +39,7 @@ foldersRouter
         res
           .status(201)
           .location(path.posix.join(req.originalUrl, `/${folder.id}`))
-          .json(serializeComment(folder))
+          .json(serializeFolder(folder))
       })
       .catch(next)
   })
@@ -77,9 +77,9 @@ foldersRouter
   })
   .patch(jsonParser, (req, res, next) => {
     const { name } = req.body
-    const commentToUpdate = { name }
+    const folderToUpdate = { name }
 
-    const numberOfValues = Object.values(FolderToUpdate).filter(Boolean).length
+    const numberOfValues = Object.values(folderToUpdate).filter(Boolean).length
     if (numberOfValues === 0)
       return res.status(400).json({
         error: {
@@ -90,7 +90,7 @@ foldersRouter
     FoldersService.updateFolder(
       req.app.get('db'),
       req.params.folder_id,
-      commentToUpdate
+      folderToUpdate
     )
       .then(numRowsAffected => {
         res.status(204).end()
