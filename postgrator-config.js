@@ -5,4 +5,5 @@ module.exports = {
      ? process.env.TEST_DATABASE_URL
      : process.env.DATABASE_URL,
      "ssl": !!process.env.SSL,
+     "predeploy": "npm audit && npm run migrate:production",
   }
