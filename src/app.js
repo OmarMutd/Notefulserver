@@ -9,8 +9,6 @@ const foldersRouter = require('./folders/folders-router')
 
 const app = express()
 
-
-
 const morganOption = (NODE_ENV === 'production')
   ? 'tiny'
   : 'common';
@@ -23,8 +21,6 @@ const morganOption = (NODE_ENV === 'production')
   app.use('/api/notes', notesRouter)
   app.use('/api/folders', foldersRouter)
 
- 
-
     app.use(function errorHandler(error, req, res, next) {
           let response
           if (NODE_ENV === 'production') {
@@ -35,8 +31,6 @@ const morganOption = (NODE_ENV === 'production')
           }
           res.status(500).json(response)
         })
-
-
 
 
 module.exports = app
