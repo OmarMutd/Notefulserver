@@ -1,107 +1,112 @@
 const path = require('path')
 const express = require('express')
 const xss = require('xss')
+const logger = require('../logger')
 const NotesService = require('./notes-service')
-
 const notesRouter = express.Router()
-const jsonParser = express.json()
+const bodyParser = express.json()
 
-const serializeNote = note => ({
-    id: note.id,
-    name: note.name,
-    content: note.content,
-    modified: note.modified,
-    folderId: note.folder_id
+const serializeNotes = notes => ({
+  id: notes.id,
+  name: xss(notes.name),
+  modified: notes.modified,
+  content: xss(notes.content),
+  folderid: Number(notes.folderid)
 })
-
 notesRouter
-.route('/')
-.get((req,res,next) => {
-    const knexInstance = req.app.get('db')
-    NotesService.getAllNotes(knexInstance)
+  .route('/')
+
+  .get((req, res, next) => {
+    const db = req.app.get('db')
+    NotesService.getAllNotes(db)
     .then(notes => {
-        res.json(notes.map(serializeNote))
+      res.json(notes.map(serializeNotes))
     })
     .catch(next)
-}
-)
-.post(jsonParser, (req, res, next) => {
-    const { name, content, modified, folder_id } = req.body
-    const newNote = { name, content, modified, folder_id }
+  })
 
-    for (const [key, value] of Object.entries(newNote))
-      if (value == null)
-        return res.status(400).json({
-          error: { message: `Missing '${key}' in request body` }
+  .post(bodyParser, (req, res, next) => {
+    const { name, modified, content, folderid } = req.body
+    const newNotes = { name, modified, content, folderid }
+    const db = req.app.get('db')
+
+    for (const field of ['name', 'content', 'folderid']) {
+      if (!newNotes[field]) {
+        logger.error(`${field} is required`)
+        return res.status(400).send({
+          error: { message: `'${field}' is required` }
         })
-
-    // newNote.date_commented = date_commented;
-
-    NotesService.insertNotes(
-      req.app.get('db'),
-      newNote
-    )
-      .then(note => {
+      }
+    }
+    NotesService.insertNotes(db, newNotes)
+      .then(notes => {
+        logger.info(`Any with id ${notes.id} created.`)
         res
           .status(201)
-          .location(path.posix.join(req.originalUrl, `/${note.id}`))
-          .json(serializeNote(note))
+          .location(path.posix.join(req.originalUrl, `${notes.id}`))
+          .json(serializeNotes(notes))
       })
       .catch(next)
   })
 
-notesRouter
-  .route('/:note_id')
-  .all((req, res, next) => {
-    NotesService.getById(
-      req.app.get('db'),
-      req.params.note_id
-    )
-      .then(note => {
-        if (!note) {
-          return res.status(404).json({
-            error: { message: `Note doesn't exist` }
-          })
-        }
-        res.note = note
-        next()
-      })
-      .catch(next)
-  })
-  .get((req, res, next) => {
-    res.json(serializeNote(res.note))
-  })
-  .delete((req, res, next) => {
-    NotesService.deleteNote(
-      req.app.get('db'),
-      req.params.note_id
-    )
-      .then(numRowsAffected => {
-        res.status(204).end()
-      })
-      .catch(next)
-  })
-  .patch(jsonParser, (req, res, next) => {
-    const { name, content, modified } = req.body
-    const noteToUpdate = { name, content, modified }
+  notesRouter
+    .route('/:notes_id')
 
-    const numberOfValues = Object.values(noteToUpdate).filter(Boolean).length
-    if (numberOfValues === 0)
-      return res.status(400).json({
-        error: {
-          message: `Request body must contain either 'content' or 'modified'`
-        }
+    .all((req, res, next) => {
+      const db = req.app.get('db')
+      const { notes_id } = req.params
+      NotesService.getById(db, notes_id)
+        .then(notes => {
+          if (!notes) {
+            logger.error(`Any with id ${notes_id} not found.`)
+            return res.status(404).json({
+              error: { message: `Any Not Found` }
+            })
+          }
+          res.notes = notes
+          next()
+        })
+        .catch(next)
+    })
+
+    .get((req, res) => {
+      res.json(serializeNotes(res.notes))
+    })
+
+    .delete((req, res, next) => {
+      const db = req.app.get('db')
+      const { notes_id } = req.params
+      NotesService.deleteNotes(db, notes_id)
+        .then(() => {
+          logger.info(`Notes with id ${notes_id} deleted.`)
+          res.status(204).end()
+        })
+        .catch(next)
       })
 
-    NotesService.updateNote(
-      req.app.get('db'),
-      req.params.note_id,
-      noteToUpdate
-    )
-      .then(numRowsAffected => {
-        res.status(204).end()
-      })
-      .catch(next)
-  })
+    .patch(bodyParser, (req, res, next) => {
+      const { name, modified, content, folderid } = req.body
+      const newNotes = { name, modified, content, folderid }
+      const db = req.app.get('db')
 
-module.exports = notesRouter
+      const numberOfValues = Object.values(newNotes).filter(Boolean).length
+      if (numberOfValues === 0) {
+        logger.error(`Invalid update without required fields`)
+        return res.status(400).json({
+          error: {
+            message: `Request body must content either 'name', 'modified', 'content', or 'folderid.`
+          }
+        })
+      }
+      if (error) return res.status(400).send(error)
+      const { notes_id } = req.params
+
+      NotesService.updateNotes(db, notes_id, newNotes)
+        .then(() => {
+          res.status(204).end()
+        })
+        .catch(next)
+
+    })
+
+    module.exports = notesRouter
